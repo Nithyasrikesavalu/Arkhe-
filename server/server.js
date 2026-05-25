@@ -19,11 +19,28 @@ const initApp = async () => {
 initApp();
 
 // Middleware Setup
+// Configure CORS to allow local dev and a production FRONTEND_URL from env
+const localOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const envOrigins = process.env.FRONTEND_URL || process.env.ALLOWED_ORIGINS || '';
+const extraOrigins = envOrigins.split(',').map(o => o.trim()).filter(Boolean);
+const allowedOrigins = Array.from(new Set([...localOrigins, ...extraOrigins]));
+
+app.use(express.json());
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS policy: Origin not allowed'), false);
+  },
   credentials: true
 }));
-app.use(express.json());
+
+// Respond to preflight requests for all routes
+app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
 // Base Route
 app.get('/', (req, res) => {
