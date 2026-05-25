@@ -19,27 +19,31 @@ const initApp = async () => {
 initApp();
 
 // Middleware Setup
-// Configure CORS to allow local dev and a production FRONTEND_URL from env
-const localOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-const envOrigins = process.env.FRONTEND_URL || process.env.ALLOWED_ORIGINS || '';
-const extraOrigins = envOrigins.split(',').map(o => o.trim()).filter(Boolean);
-const allowedOrigins = Array.from(new Set([...localOrigins, ...extraOrigins]));
+// Configure CORS to allow only the Vercel frontend domain (and localhost for development)
+const allowedOrigins = [
+  'https://arkhe-nsqt.vercel.app',
+  // Development origins – keep them while debugging locally
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
 
 app.use(express.json());
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps, curl, server-to-server)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    }
-    return callback(new Error('CORS policy: Origin not allowed'), false);
-  },
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, server‑to‑server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      const msg = 'CORS policy: Origin not allowed – ' + origin;
+      return callback(new Error(msg), false);
+    },
+    credentials: true,
+    optionsSuccessStatus: 200,
+  })
+);
 
-// Respond to preflight requests for all routes
+// Respond to preflight (OPTIONS) requests for all routes
 app.options('*', cors({ origin: allowedOrigins, credentials: true }));
 
 // Base Route
@@ -47,7 +51,7 @@ app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to ARKHE Luxury Real Estate API',
     database: global.isMongoConnected ? 'Connected' : 'Disconnected (Fallback Mode Active)',
-    version: '1.0.0'
+    version: '1.0.0',
   });
 });
 
@@ -56,7 +60,7 @@ app.get('/health', (req, res) => {
   const status = global.isMongoConnected ? 'Connected' : 'Disconnected';
   res.json({
     database: status,
-    message: status === 'Connected' ? 'Database is connected' : 'Running in fallback mode (no DB connection)'
+    message: status === 'Connected' ? 'Database is connected' : 'Running in fallback mode (no DB connection)',
   });
 });
 
@@ -64,7 +68,7 @@ app.get('/health', (req, res) => {
 // app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/contacts', contactRoutes);
 
-// Error Middlewares
+// Error handling middleware – must be the last middleware added
 app.use(notFound);
 app.use(errorHandler);
 
